@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8" />
     <title>Intelligent Form Filler</title>
     <style>
       :root {
@@ -158,6 +159,27 @@
       .status.show {
         animation: fadeIn 0.3s ease-out;
       }
+
+      .shortcut-info {
+        margin-top: 1rem;
+        text-align: center;
+        font-size: 0.875rem;
+        color: #64748b;
+      }
+
+      .shortcut-key {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        background: #e2e8f0;
+        border-radius: 0.25rem;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        margin: 0 0.25rem;
+      }
+
+      textarea#userData {
+        min-height: 200px;
+      }
     </style>
   </head>
   <body>
@@ -176,14 +198,18 @@
         <label for="userData">User Information</label>
         <textarea
           id="userData"
-          rows="4"
-          placeholder="Name: Peter Doe&#10;Email: peter@example.com&#10;Address: 123 Space Ave..."
+          rows="8"
+          placeholder="Name: Peter Doe&#10;Email: peter@example.com&#10;Work Email: work@company.com (Use for job applications only)&#10;Address: 123 Space Ave&#10;Shipping Address: 456 Box St (Use for shopping sites)&#10;Phone: +1 555-0123&#10;Company: For job applications, use: Tech Corp Inc&#10;&#10;For food delivery sites:&#10;Delivery Instructions: Leave at door, ring bell twice"
         ></textarea>
         <div class="spinner"></div>
       </div>
       <div class="button-group">
         <button id="save">Save Settings</button>
         <button id="fill">Fill Form</button>
+      </div>
+      <div class="shortcut-info">
+        Keyboard shortcut: <span class="shortcut-key">⌘⇧E</span> (Mac) or
+        <span class="shortcut-key">Ctrl+Shift+E</span> (Windows/Linux)
       </div>
       <div class="status" id="status"></div>
     </div>

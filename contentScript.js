@@ -1,252 +1,5 @@
 // contentScript.js: Scans the page for form fields, sends them for completion, and fills them.
 
-// Wait for DOM to be ready
-function initFormFiller() {
-  // Add styles for the fill dot
-  if (!document.getElementById('form-filler-styles')) {
-    const style = document.createElement('style');
-    style.id = 'form-filler-styles';
-    style.textContent = `
-      .form-filler-dot {
-        position: absolute;
-        width: 12px;
-        height: 12px;
-        background-color: #6366f1;
-        border-radius: 50%;
-        cursor: pointer;
-        opacity: 0.8;
-        transition: transform 0.2s ease-out;
-        z-index: 10000;
-        right: 8px;
-        top: 0;
-        bottom: 0;
-        margin: auto;
-        pointer-events: auto;
-      }
-      .form-filler-dot:hover {
-        opacity: 1;
-        transform: scale(1.1);
-      }
-      .form-filler-dot.loading {
-        background-color: transparent;
-        border: 2px solid #e2e8f0;
-        border-top-color: #6366f1;
-        animation: form-filler-spin 0.8s linear infinite;
-        box-sizing: border-box;
-      }
-      @keyframes form-filler-spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-      .form-filler-field-wrapper {
-        position: relative !important;
-        display: block !important;
-        width: 100% !important;
-        height: 100% !important;
-      }
-      .form-filler-field-wrapper input,
-      .form-filler-field-wrapper textarea,
-      .form-filler-field-wrapper select {
-        width: 100% !important;
-        box-sizing: border-box !important;
-        padding-right: 28px !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  // Function to create and position a dot
-  function createFillDot(field) {
-    if (!field.isConnected) return null;
-
-    // Add wrapper class to the field's parent if needed
-    const existingWrapper = field.parentElement.classList.contains('form-filler-field-wrapper');
-    if (!existingWrapper) {
-      field.parentElement.classList.add('form-filler-field-wrapper');
-    }
-
-    // Remove any existing dots
-    const existingDot = field.parentElement.querySelector('.form-filler-dot');
-    if (existingDot) {
-      existingDot.remove();
-    }
-
-    const dot = document.createElement('div');
-    dot.className = 'form-filler-dot';
-    field.parentElement.appendChild(dot);
-
-    // Add click handler
-    dot.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      if (!field.isConnected) {
-        dot.remove();
-        return;
-      }
-
-      dot.classList.add('loading');
-
-      // Get all form fields info
-      const fieldsInfo = [];
-      document.querySelectorAll('input, textarea, select').forEach((field, index) => {
-        if (!field.isConnected || 
-            field.type === 'hidden' || 
-            field.disabled ||
-            field.type === 'password' || 
-            field.type === 'search' ||
-            field.type === 'submit' ||
-            field.type === 'button' ||
-            field.name?.toLowerCase().includes('search') ||
-            field.id?.toLowerCase().includes('search') ||
-            field.placeholder?.toLowerCase().includes('search')) {
-          return;
-        }
-
-        const labels = [];
-        if (field.id) {
-          const associatedLabel = document.querySelector(`label[for="${field.id}"]`);
-          if (associatedLabel) {
-            labels.push(associatedLabel.innerText.trim());
-          }
-        }
-
-        let parentLabel = field.closest('label');
-        if (parentLabel) {
-          labels.push(parentLabel.innerText.trim());
-        }
-
-        if (field.getAttribute('aria-labelledby')) {
-          const labelIds = field.getAttribute('aria-labelledby').split(' ');
-          labelIds.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) labels.push(element.innerText.trim());
-          });
-        }
-
-        // For select fields, get options
-        const options = field.tagName.toLowerCase() === 'select' 
-          ? Array.from(field.options).map(opt => opt.text.trim())
-          : [];
-
-        const fieldInfo = {
-          index: index + 1,
-          type: field.tagName.toLowerCase() === 'select' ? 'select' : (field.type || 'text'),
-          name: field.name || '',
-          id: field.id || '',
-          placeholder: field.placeholder || '',
-          ariaLabel: field.getAttribute('aria-label') || '',
-          labels: labels.filter(l => l),
-          required: field.required,
-          pattern: field.pattern,
-          minLength: field.minLength,
-          maxLength: field.maxLength,
-          validationMessage: field.validationMessage,
-          options,
-          className: field.className,
-          autocomplete: field.getAttribute('autocomplete') || ''
-        };
-
-        fieldsInfo.push(fieldInfo);
-      });
-
-      const pageContext = {
-        title: document.title,
-        url: window.location.href,
-        metaDescription: document.querySelector('meta[name="description"]')?.content || '',
-        h1: Array.from(document.getElementsByTagName('h1')).map(h => h.innerText).join(' '),
-      };
-
-      // Send message to background to get completion for all fields
-      chrome.runtime.sendMessage({
-        action: 'getCompletion',
-        fieldsInfo,
-        pageContext
-      }, (response) => {
-        dot.classList.remove('loading');
-        
-        if (response && response.fields) {
-          // Fill all fields
-          fieldsInfo.forEach((info, index) => {
-            const fieldToFill = document.querySelector(`#${info.id}`) || 
-                              document.querySelector(`[name="${info.name}"]`) ||
-                              document.querySelectorAll('input, textarea')[info.index - 1];
-            
-            if (fieldToFill && response.fields[(index + 1).toString()]) {
-              fieldToFill.value = response.fields[(index + 1).toString()];
-              fieldToFill.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          });
-        }
-      });
-    });
-
-    return dot;
-  }
-
-  // Add dots to all appropriate input fields
-  function addDotsToFields() {
-    try {
-      // Find all input fields
-      document.querySelectorAll('input, textarea').forEach(field => {
-        try {
-          // Skip if field is not visible, or is password/search
-          if (!field.isConnected || 
-              field.type === 'hidden' || 
-              field.disabled ||
-              field.type === 'password' || 
-              field.type === 'search' ||
-              field.type === 'submit' ||
-              field.type === 'button' ||
-              field.name?.toLowerCase().includes('search') ||
-              field.id?.toLowerCase().includes('search') ||
-              field.placeholder?.toLowerCase().includes('search')) {
-            return;
-          }
-
-          createFillDot(field);
-        } catch (err) {
-          console.error('Error processing field:', err);
-        }
-      });
-
-      // Add wrapper to select elements without dots
-      document.querySelectorAll('select').forEach(field => {
-        try {
-          if (!field.isConnected || field.disabled) {
-            return;
-          }
-          if (!field.parentElement.classList.contains('form-filler-field-wrapper')) {
-            field.parentElement.classList.add('form-filler-field-wrapper');
-          }
-        } catch (err) {
-          console.error('Error processing select field:', err);
-        }
-      });
-    } catch (err) {
-      console.error('Error in addDotsToFields:', err);
-    }
-  }
-
-  // Add dots when the page is fully loaded
-  if (document.readyState === 'complete') {
-    addDotsToFields();
-  } else {
-    window.addEventListener('load', addDotsToFields);
-  }
-}
-
-// Initialize the form filler
-if (document.readyState !== 'loading') {
-  initFormFiller();
-} else {
-  document.addEventListener('DOMContentLoaded', initFormFiller);
-}
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fillFields') {
     console.log('Content: Received fillFields request');
@@ -264,13 +17,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
 
-      // Skip password fields and search-related fields
+      // Skip password fields, search-related fields, and already filled fields
       if (field.type === 'password' || 
           field.type === 'search' ||
           field.name?.toLowerCase().includes('search') ||
           field.id?.toLowerCase().includes('search') ||
-          field.placeholder?.toLowerCase().includes('search')) {
-        console.log('Content: Skipping sensitive/search field', { type: field.type, id: field.id });
+          field.placeholder?.toLowerCase().includes('search') ||
+          (field.value && field.value.trim() !== '')) { // Skip if field already has a value
+        console.log('Content: Skipping sensitive/search/filled field', { type: field.type, id: field.id });
         return;
       }
 
@@ -349,8 +103,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
 
     if (fieldsInfo.length === 0) {
-      console.log('Content: No fields found');
-      sendResponse({status: "No fields found on this page."});
+      console.log('Content: No empty fields found');
+      sendResponse({status: "No empty fields found on this page."});
       return;
     }
 
@@ -418,7 +172,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             console.error('Content: Could not find field for info', info);
           }
         }
-        sendResponse({status: "Fields filled successfully!"});
+        sendResponse({status: "Empty fields filled successfully!"});
       } else if (response && response.error) {
         console.error('Content: Error response received', response.error);
         sendResponse({status: "Error: " + response.error});
@@ -432,7 +186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Add logging to helper function
+// Helper function to find field by info
 function findFieldByInfo(info) {
   console.log('Content: Finding field by info', info);
   

@@ -21,27 +21,42 @@ Never fill out forms manually again! This Chrome extension uses artificial intel
 
 1. Click the extension's icon in your Chrome toolbar (top-right)
 2. Add your OpenAI API key (this powers the AI features)
-3. Enter your personal details like this:
+3. Enter your personal details. You can add context and conditions for different situations:
    ```
    Name: John Doe
    Email: john@example.com
+   Work Email: work@company.com (Use for job applications only)
    Address: 123 Main St
+   Shipping Address: 456 Box St (Use for shopping sites)
    Phone: (555) 123-4567
+   Company: For job applications, use: Tech Corp Inc
+
+   For food delivery sites:
+   Delivery Instructions: Leave at door, ring bell twice
    ```
 4. Click "Save Settings" and you're ready to go!
 
+The AI will understand these instructions and use the appropriate information based on the website and form context.
+
 ## How to Use
 
-1. Go to any website with a form
-2. Click the extension icon
-3. Hit the "Fill Form" button
-4. Watch as the form fills itself out automatically!
+There are two ways to fill forms:
+
+1. Using the keyboard shortcut:
+   - Mac: Press `Command + Shift + E`
+   - Windows/Linux: Press `Ctrl + Shift + E`
+
+2. Using the popup:
+   - Click the extension icon
+   - Click the "Fill Form" button
+
+The extension will automatically fill all empty form fields on the page, leaving any already filled fields untouched.
 
 ## Privacy & Security
 
 - Your personal information stays on your computer
 - Your API key and details are stored securely in Chrome
-- The extension only works when you click the button
+- The extension only works when you activate it
 - Only sends form structure data to OpenAI (never your personal info)
 
 ## How It Works

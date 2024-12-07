@@ -1,6 +1,17 @@
 // background.js: The service worker that listens for messages from content scripts,
 // calls the OpenAI API, and returns structured output.
 
+// Listen for keyboard shortcuts
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'fill-form') {
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {action: 'fillFields'});
+      }
+    });
+  }
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getCompletion') {
     console.log('Background: Received getCompletion request', request);

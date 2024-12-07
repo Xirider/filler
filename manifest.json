@@ -26,5 +26,14 @@
       "js": ["contentScript.js"],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "commands": {
+    "fill-form": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Fill all form fields"
+    }
+  }
 } 
