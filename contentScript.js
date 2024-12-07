@@ -1,5 +1,23 @@
 // contentScript.js: Scans the page for form fields, sends them for completion, and fills them.
 
+// Add styles for the glow effect
+const style = document.createElement('style');
+style.textContent = `
+  .form-field-glow {
+    transition: box-shadow 0.2s ease-in-out;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.6) !important;
+  }
+`;
+document.head.appendChild(style);
+
+// Function to apply glow effect
+function applyGlowEffect(element) {
+  element.classList.add('form-field-glow');
+  setTimeout(() => {
+    element.classList.remove('form-field-glow');
+  }, 200);
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fillFields') {
     console.log('Content: Received fillFields request');
@@ -156,6 +174,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 field.selectedIndex = 0;
               }
               field.dispatchEvent(new Event('change', {bubbles: true}));
+              applyGlowEffect(field);
               console.log('Content: Handling select field', {
                 options: field.options.length,
                 valueToFill
@@ -163,6 +182,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } else {
               field.value = valueToFill;
               field.dispatchEvent(new Event('input', {bubbles: true}));
+              applyGlowEffect(field);
               console.log('Content: Field filled', {
                 field: field,
                 value: valueToFill
