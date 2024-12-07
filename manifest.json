@@ -1,8 +1,14 @@
 {
   "name": "Intelligent Form Filler",
   "version": "1.0",
-  "description": "A Chrome extension that identifies form fields, queries the OpenAI API for structured fill data, and populates them automatically.",
+  "description": "Stop filling forms manually! This AI-powered extension automatically fills out web forms for you, saving time and reducing errors.",
   "manifest_version": 3,
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "storage",
     "activeTab",
