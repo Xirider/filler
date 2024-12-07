@@ -32,6 +32,42 @@
 
       .input-group {
         margin-bottom: 1.25rem;
+        position: relative;
+      }
+
+      /* Spinner styles */
+      .spinner {
+        display: none;
+        position: absolute;
+        right: 10px;
+        top: calc(50% + 10px);
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        border: 2px solid #e2e8f0;
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        pointer-events: none;
+      }
+
+      .input-group.loading .spinner {
+        display: block;
+      }
+
+      @keyframes spin {
+        from {
+          transform: translateY(-50%) rotate(0deg);
+        }
+        to {
+          transform: translateY(-50%) rotate(360deg);
+        }
+      }
+
+      .input-group.loading input,
+      .input-group.loading textarea {
+        padding-right: 35px;
+        background-color: #f8fafc;
       }
 
       label {
@@ -134,6 +170,7 @@
           id="apiKey"
           placeholder="Enter your API key (sk-...)"
         />
+        <div class="spinner"></div>
       </div>
       <div class="input-group">
         <label for="userData">User Information</label>
@@ -142,6 +179,7 @@
           rows="4"
           placeholder="Name: Peter Doe&#10;Email: peter@example.com&#10;Address: 123 Space Ave..."
         ></textarea>
+        <div class="spinner"></div>
       </div>
       <div class="button-group">
         <button id="save">Save Settings</button>

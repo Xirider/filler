@@ -1,5 +1,302 @@
 // contentScript.js: Scans the page for form fields, sends them for completion, and fills them.
 
+// Wait for DOM to be ready
+function initFormFiller() {
+  // Add styles for the fill dot
+  if (!document.getElementById('form-filler-styles')) {
+    const style = document.createElement('style');
+    style.id = 'form-filler-styles';
+    style.textContent = `
+      .form-filler-dot {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background-color: #6366f1;
+        border-radius: 50%;
+        cursor: pointer;
+        opacity: 0.8;
+        transition: transform 0.2s ease-out;
+        z-index: 10000;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: auto;
+      }
+      .form-filler-dot:hover {
+        opacity: 1;
+        transform: translateY(-50%) scale(1.1);
+      }
+      .form-filler-dot.loading {
+        background-color: transparent;
+        border: 2px solid #e2e8f0;
+        border-top-color: #6366f1;
+        animation: form-filler-spin 0.8s linear infinite;
+        box-sizing: border-box;
+      }
+      @keyframes form-filler-spin {
+        from {
+          transform: translateY(-50%) rotate(0deg);
+        }
+        to {
+          transform: translateY(-50%) rotate(360deg);
+        }
+      }
+      .form-filler-field-wrapper {
+        position: relative !important;
+      }
+      /* Ensure input fields maintain their original size */
+      .form-filler-field-wrapper input,
+      .form-filler-field-wrapper textarea {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding-right: 28px !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Function to create and position a dot
+  function createFillDot(field) {
+    // Check if field is still in DOM
+    if (!field.isConnected) return null;
+
+    // Add wrapper class to the field's parent if needed
+    const existingWrapper = field.parentElement.classList.contains('form-filler-field-wrapper');
+    if (!existingWrapper) {
+      // Instead of creating a new wrapper, add the class to the parent
+      field.parentElement.classList.add('form-filler-field-wrapper');
+    }
+
+    // Remove any existing dots
+    const existingDot = field.parentElement.querySelector('.form-filler-dot');
+    if (existingDot) {
+      existingDot.remove();
+    }
+
+    const dot = document.createElement('div');
+    dot.className = 'form-filler-dot';
+    field.parentElement.appendChild(dot);
+
+    // Add click handler
+    dot.addEventListener('click', async (e) => {
+      console.log('Dot clicked!');
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (!field.isConnected) {
+        console.log('Field not connected, removing dot');
+        dot.remove();
+        return;
+      }
+
+      console.log('Adding loading state to dot');
+      dot.classList.add('loading');
+
+      // Get all form fields info
+      const fieldsInfo = [];
+      document.querySelectorAll('input, textarea').forEach((field, index) => {
+        if (!field.isConnected || 
+            field.type === 'hidden' || 
+            field.disabled ||
+            field.type === 'password' || 
+            field.type === 'search' ||
+            field.type === 'submit' ||
+            field.type === 'button' ||
+            field.name?.toLowerCase().includes('search') ||
+            field.id?.toLowerCase().includes('search') ||
+            field.placeholder?.toLowerCase().includes('search')) {
+          return;
+        }
+
+        const labels = [];
+        if (field.id) {
+          const associatedLabel = document.querySelector(`label[for="${field.id}"]`);
+          if (associatedLabel) {
+            labels.push(associatedLabel.innerText.trim());
+          }
+        }
+
+        let parentLabel = field.closest('label');
+        if (parentLabel) {
+          labels.push(parentLabel.innerText.trim());
+        }
+
+        if (field.getAttribute('aria-labelledby')) {
+          const labelIds = field.getAttribute('aria-labelledby').split(' ');
+          labelIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) labels.push(element.innerText.trim());
+          });
+        }
+
+        const fieldInfo = {
+          index: index + 1,
+          type: field.type || 'text',
+          name: field.name || '',
+          id: field.id || '',
+          placeholder: field.placeholder || '',
+          ariaLabel: field.getAttribute('aria-label') || '',
+          labels: labels.filter(l => l),
+          required: field.required,
+          pattern: field.pattern,
+          minLength: field.minLength,
+          maxLength: field.maxLength,
+          validationMessage: field.validationMessage,
+          className: field.className,
+          autocomplete: field.getAttribute('autocomplete') || ''
+        };
+
+        fieldsInfo.push(fieldInfo);
+      });
+
+      const pageContext = {
+        title: document.title,
+        url: window.location.href,
+        metaDescription: document.querySelector('meta[name="description"]')?.content || '',
+        h1: Array.from(document.getElementsByTagName('h1')).map(h => h.innerText).join(' '),
+      };
+
+      // Send message to background to get completion for all fields
+      chrome.runtime.sendMessage({
+        action: 'getCompletion',
+        fieldsInfo,
+        pageContext
+      }, (response) => {
+        console.log('Received response:', response);
+        dot.classList.remove('loading');
+        
+        if (response && response.fields) {
+          console.log('Filling fields with:', response.fields);
+          // Fill all fields
+          fieldsInfo.forEach((info, index) => {
+            const fieldToFill = document.querySelector(`#${info.id}`) || 
+                              document.querySelector(`[name="${info.name}"]`) ||
+                              document.querySelectorAll('input, textarea')[info.index - 1];
+            
+            if (fieldToFill && response.fields[(index + 1).toString()]) {
+              fieldToFill.value = response.fields[(index + 1).toString()];
+              fieldToFill.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+        }
+      });
+    });
+
+    return dot;
+  }
+
+  // Function to add dots to all appropriate input fields
+  let isProcessingDots = false;  // Add this flag at the top level
+
+  function addDotsToFields() {
+    if (isProcessingDots) return;  // Skip if we're already processing
+    
+    try {
+      isProcessingDots = true;
+
+      // Only remove existing dots, don't unwrap fields
+      document.querySelectorAll('.form-filler-dot').forEach(dot => {
+        if (dot.isConnected) dot.remove();
+      });
+
+      // Remove wrapper classes from elements that no longer have inputs
+      document.querySelectorAll('.form-filler-field-wrapper').forEach(wrapper => {
+        if (!wrapper.querySelector('input, textarea')) {
+          wrapper.classList.remove('form-filler-field-wrapper');
+        }
+      });
+
+      // Find all input fields
+      document.querySelectorAll('input, textarea').forEach(field => {
+        try {
+          // Skip if field is not visible, or is password/search
+          if (!field.isConnected || 
+              field.type === 'hidden' || 
+              field.disabled ||
+              field.type === 'password' || 
+              field.type === 'search' ||
+              field.type === 'submit' ||
+              field.type === 'button' ||
+              field.name?.toLowerCase().includes('search') ||
+              field.id?.toLowerCase().includes('search') ||
+              field.placeholder?.toLowerCase().includes('search')) {
+            return;
+          }
+
+          createFillDot(field);
+        } catch (err) {
+          console.error('Error processing field:', err);
+        }
+      });
+    } catch (err) {
+      console.error('Error in addDotsToFields:', err);
+    } finally {
+      isProcessingDots = false;
+    }
+  }
+
+  // Add dots initially and when DOM changes
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', addDotsToFields);
+  } else {
+    addDotsToFields();
+  }
+
+  // Set up the observer only if we haven't already
+  if (!window._formFillerObserver) {
+    try {
+      let debounceTimeout;
+      window._formFillerObserver = new MutationObserver((mutations) => {
+        // Check if any of the mutations affect our dots or input fields
+        const shouldUpdate = mutations.some(mutation => {
+          // Check if the mutation affects our dots or wrappers
+          if (mutation.target.classList?.contains('form-filler-dot') ||
+              mutation.target.classList?.contains('form-filler-field-wrapper')) {
+            return false;
+          }
+          
+          // Check if any added/removed nodes are inputs or contain inputs
+          const hasInputChanges = [...(mutation.addedNodes || []), ...(mutation.removedNodes || [])].some(node => {
+            return node.tagName === 'INPUT' || 
+                   node.tagName === 'TEXTAREA' || 
+                   node.querySelector?.('input, textarea');
+          });
+
+          return hasInputChanges;
+        });
+
+        if (shouldUpdate) {
+          clearTimeout(debounceTimeout);
+          debounceTimeout = setTimeout(addDotsToFields, 200);  // Increased debounce time
+        }
+      });
+
+      window._formFillerObserver.observe(document.body, { 
+        childList: true, 
+        subtree: true,
+        attributes: false  // Don't observe attribute changes
+      });
+    } catch (err) {
+      console.error('Error setting up observer:', err);
+    }
+  }
+}
+
+// Initialize the form filler
+if (document.body) {
+  initFormFiller();
+} else {
+  // If body isn't available yet, wait for it
+  const observer = new MutationObserver((mutations, obs) => {
+    if (document.body) {
+      obs.disconnect();
+      initFormFiller();
+    }
+  });
+
+  observer.observe(document.documentElement, { childList: true });
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fillFields') {
     console.log('Content: Received fillFields request');
