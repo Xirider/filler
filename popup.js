@@ -5,14 +5,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const fillButton = document.getElementById('fill');
   const statusEl = document.getElementById('status');
   let isLoading = false;
+  let actualApiKey = ''; // Store the actual API key
 
   // Load saved settings
   chrome.storage.local.get(['openai_api_key', 'user_data'], (result) => {
     if (result.openai_api_key) {
-      apiKeyInput.value = result.openai_api_key;
+      actualApiKey = result.openai_api_key;
+      apiKeyInput.value = '*'.repeat(result.openai_api_key.length);
     }
     if (result.user_data) {
       userDataInput.value = result.user_data;
+    }
+  });
+
+  // Handle API key input changes
+  apiKeyInput.addEventListener('focus', () => {
+    apiKeyInput.value = actualApiKey;
+  });
+
+  apiKeyInput.addEventListener('blur', () => {
+    if (apiKeyInput.value.trim()) {
+      actualApiKey = apiKeyInput.value.trim();
+      apiKeyInput.value = '*'.repeat(actualApiKey.length);
     }
   });
 
@@ -31,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isLoading = true;
     setLoading(true);
     
-    const apiKey = apiKeyInput.value.trim();
+    const apiKey = actualApiKey;
     const userData = userDataInput.value.trim();
     
     try {

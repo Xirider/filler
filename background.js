@@ -65,7 +65,7 @@ URL: ${request.pageContext.url}
 Description: ${request.pageContext.metaDescription}
 Main Heading: ${request.pageContext.h1}
 
-Here are the fields found on the page:\n${fieldsDescription}\n\nUser data:\n${userData}\n\nPlease return a JSON with the following structure:\n{\n  "fields": [\n    {"key": "1", "value": "value_for_field_1"},\n    {"key": "2", "value": "value_for_field_2"},\n    ...\n  ]\n}\n\nOnly include fields where you have confident matches. Use the page context to make more accurate field completions. Omit fields you're unsure about or shouldn't fill.`;
+Here are the fields found on the page:\n${fieldsDescription}\n\nUser data:\n-------\n${userData}\n--------\n\nPlease return a JSON with the following structure:\n{\n  "fields": [\n    {"key": "1", "value": "value_for_field_1"},\n    {"key": "2", "value": "value_for_field_2"},\n    ...\n  ]\n}\n\n`;
 
         const userMessage = {
           "role": "user",
@@ -78,6 +78,7 @@ Here are the fields found on the page:\n${fieldsDescription}\n\nUser data:\n${us
         });
 
         console.log('Background: Sending request to OpenAI API');
+        console.log('User message:', userMessage.content);
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
