@@ -20,7 +20,15 @@ Never fill out forms manually again! This Chrome extension uses artificial intel
 ## First-Time Setup
 
 1. Click the extension's icon in your Chrome toolbar (top-right)
-2. Add your OpenAI API key (this powers the AI features)
+2. Add your OpenAI API key:
+   - Go to [OpenAI's platform](https://platform.openai.com)
+   - Create an account if you haven't already
+   - Navigate to the API Keys section
+   - Click "Create new secret key"
+   - Give your key a name (e.g., "key1")
+   - Copy the generated key immediately (you won't be able to see it again!)
+   - Paste the key into the extension's settings
+   > ⚠️ Keep your API key secure and never share it publicly. If compromised, you can always revoke it and create a new one.
 3. Enter your personal details. You can add context and conditions for different situations:
    ```
    Name: John Doe
@@ -58,20 +66,6 @@ The extension will automatically fill all empty form fields on the page, leaving
 - Your API key and details are stored securely in Chrome
 - The extension only works when you activate it
 - Only sends form structure data to OpenAI (never your personal info)
-
-## How It Works
-
-The extension uses several parts working together:
-- A popup window where you manage your settings
-- A smart system that detects forms on websites
-- AI technology that understands what each form field needs
-- A background process that handles all the AI magic
-
-## System Requirements
-
-- Google Chrome (recent version)
-- OpenAI API key
-- Internet connection
 
 ## Want to Help?
 
